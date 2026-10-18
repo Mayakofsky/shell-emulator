@@ -4,6 +4,8 @@
 #include "ExitCommand.hpp"
 #include "FindCommand.hpp"
 #include "LsCommand.hpp"
+#include "MvCommand.hpp"
+#include "RmCommand.hpp"
 #include "VfsLoadCommand.hpp"
 #include "VfsReadCommand.hpp"
 #include "VfsTreeCommand.hpp"
@@ -17,6 +19,8 @@ CommandRegistry::CommandRegistry()
     registerCommand(std::make_unique<WcCommand>());
     registerCommand(std::make_unique<FindCommand>());
     registerCommand(std::make_unique<WhoCommand>());
+    registerCommand(std::make_unique<RmCommand>());
+    registerCommand(std::make_unique<MvCommand>());
     registerCommand(std::make_unique<ExitCommand>());
     registerCommand(std::make_unique<VfsLoadCommand>());
     registerCommand(std::make_unique<VfsTreeCommand>());

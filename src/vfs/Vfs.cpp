@@ -14,6 +14,29 @@ std::string joinPath(const std::string& prefix, const std::string& name)
     }
     return prefix + "/" + name;
 }
+
+std::unique_ptr<VfsNode> takeChild(VfsNode& parent, const std::string& name)
+{
+    std::vector<std::unique_ptr<VfsNode>>& children = parent.children;
+    for (std::vector<std::unique_ptr<VfsNode>>::iterator it = children.begin();
+        it != children.end(); ++it)
+    {
+        if ((*it)->name == name)
+        {
+            std::unique_ptr<VfsNode> detached = std::move(*it);
+            children.erase(it);
+            return detached;
+        }
+    }
+    return nullptr;
+}
+
+bool isInside(const std::string& directory, const std::string& path)
+{
+    return path.size() > directory.size() + 1 &&
+        path.compare(0, directory.size(), directory) == 0 &&
+        path[directory.size()] == '/';
+}
 }
 
 Vfs::Vfs()
@@ -242,4 +265,153 @@ std::vector<std::string> Vfs::listPaths(const std::string& path,
     collectSubtree(*node, canonical, paths);
     std::sort(paths.begin(), paths.end());
     return paths;
+}
+
+VfsNode* Vfs::locateParent(const std::string& base, const std::string& path,
+    VfsNode*& parent, std::string& leaf, std::string& canonical)
+{
+    const std::vector<std::string> components = splitPath(combine(base, path));
+    if (components.empty())
+    {
+        parent = &root_;
+        leaf.clear();
+        canonical = "/";
+        return &root_;
+    }
+
+    leaf = components.back();
+    if (leaf == "." || leaf == "..")
+    {
+        parent = nullptr;
+        leaf.clear();
+        canonical.clear();
+        return nullptr;
+    }
+
+    std::string parentPath = "/";
+    for (std::size_t index = 0; index + 1 < components.size(); ++index)
+    {
+        parentPath = joinPath(parentPath, components[index]);
+    }
+
+    std::string parentCanonical;
+    parent = walk(parentPath, parentCanonical);
+    if (parent == nullptr || !parent->directory)
+    {
+        parent = nullptr;
+        leaf.clear();
+        canonical.clear();
+        return nullptr;
+    }
+
+    canonical = joinPath(parentCanonical, leaf);
+    return parent;
+}
+
+bool Vfs::removeEntry(const std::string& base, const std::string& path,
+    bool recursive, std::string& error)
+{
+    error.clear();
+    VfsNode* parent = nullptr;
+    std::string leaf;
+    std::string canonical;
+    VfsNode* located = locateParent(base, path, parent, leaf, canonical);
+    if (located == nullptr)
+    {
+        error = "no such file: " + path;
+        return false;
+    }
+    if (leaf.empty())
+    {
+        error = "cannot remove root: /";
+        return false;
+    }
+
+    VfsNode* child = parent->findChild(leaf);
+    if (child == nullptr)
+    {
+        error = "no such file: " + path;
+        return false;
+    }
+    if (child->directory && !recursive)
+    {
+        error = "is a directory: " + path;
+        return false;
+    }
+
+    takeChild(*parent, leaf);
+    return true;
+}
+
+bool Vfs::moveEntry(const std::string& base, const std::string& source,
+    const std::string& destination, std::string& error)
+{
+    error.clear();
+    VfsNode* sourceParent = nullptr;
+    std::string sourceLeaf;
+    std::string sourceCanonical;
+    VfsNode* located = locateParent(base, source, sourceParent, sourceLeaf,
+        sourceCanonical);
+    if (located == nullptr)
+    {
+        error = "no such file: " + source;
+        return false;
+    }
+    if (sourceLeaf.empty())
+    {
+        error = "cannot move root: /";
+        return false;
+    }
+
+    VfsNode* node = sourceParent->findChild(sourceLeaf);
+    if (node == nullptr)
+    {
+        error = "no such file: " + source;
+        return false;
+    }
+
+    std::string destinationCanonical;
+    VfsNode* destinationNode = walk(combine(base, destination),
+        destinationCanonical);
+
+    VfsNode* destinationParent = nullptr;
+    std::string destinationLeaf;
+    std::string targetCanonical;
+    if (destinationNode != nullptr && destinationNode->directory)
+    {
+        destinationParent = destinationNode;
+        destinationLeaf = sourceLeaf;
+        targetCanonical = joinPath(destinationCanonical, sourceLeaf);
+    }
+    else
+    {
+        VfsNode* parentLocated = locateParent(base, destination, destinationParent,
+            destinationLeaf, targetCanonical);
+        if (parentLocated == nullptr || destinationLeaf.empty())
+        {
+            error = "invalid target: " + destination;
+            return false;
+        }
+    }
+
+    if (targetCanonical == sourceCanonical)
+    {
+        return true;
+    }
+    if (node->directory && isInside(sourceCanonical, targetCanonical))
+    {
+        error = "cannot move a directory into itself: " + source;
+        return false;
+    }
+
+    std::unique_ptr<VfsNode> detached = takeChild(*sourceParent, sourceLeaf);
+    if (detached == nullptr)
+    {
+        error = "no such file: " + source;
+        return false;
+    }
+    takeChild(*destinationParent, destinationLeaf);
+    detached->name = destinationLeaf;
+    destinationParent->children.push_back(std::move(detached));
+    return true;
 }

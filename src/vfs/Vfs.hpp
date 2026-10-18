@@ -31,7 +31,6 @@ public:
 private:
     static std::vector<std::string> splitPath(const std::string& path);
     static std::string combine(const std::string& base, const std::string& path);
-    static void eraseChild(VfsNode& parent, const std::string& name);
 
     VfsNode* walk(const std::string& path, std::string& canonical);
     const VfsNode* resolveCanonical(const std::string& path,

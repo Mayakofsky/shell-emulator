@@ -1,0 +1,19 @@
+ls /
+cd /docs
+ls
+mv guide.txt renamed.md
+ls
+find / -name "*.md"
+cd /
+mv /notes.txt /docs/moved.txt
+find / -type f
+rm /readme.md
+rm /docs
+rm -r /docs
+ls /
+find /
+rm -rf /missing
+rm /missing
+rm /
+exit 0
+ls after-exit

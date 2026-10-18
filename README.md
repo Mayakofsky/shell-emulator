@@ -2,9 +2,10 @@
 
 ## 1. Описание проекта и этап
 
-Проект для дисциплины «Конфигурационное управление», вариант №7. Этап 4
-делает команды `ls` и `cd` рабочими поверх VFS и добавляет команды `wc`,
-`find` и `who`. Этап 3 добавил виртуальную файловую систему (VFS),
+Проект для дисциплины «Конфигурационное управление», вариант №7. Этап 5
+добавляет команды `rm` и `mv`, завершая набор файловых операций над VFS.
+Этап 4 сделал команды `ls` и `cd` рабочими поверх VFS и добавил команды
+`wc`, `find` и `who`. Этап 3 добавил виртуальную файловую систему (VFS),
 загружаемую из ZIP-архива целиком в память, и служебные команды `vfs-load`,
 `vfs-tree`, `vfs-read`. Этап 2 расширил REPL настройкой через CLI и XML,
 JSON Lines-логированием и стартовым скриптом.
@@ -43,13 +44,15 @@ JSON Lines-логированием и стартовым скриптом.
 - `src/commands/FindCommand.hpp/.cpp`: обход поддерева VFS с фильтрами
   `-name` и `-type`.
 - `src/commands/WhoCommand.hpp/.cpp`: печать имени пользователя и хоста.
+- `src/commands/RmCommand.hpp/.cpp`: удаление файлов и каталогов VFS.
+- `src/commands/MvCommand.hpp/.cpp`: переименование и перемещение узлов VFS.
 - `src/commands/ExitCommand.hpp/.cpp`: проверка аргумента и завершение REPL.
 - `src/commands/VfsLoadCommand.hpp/.cpp`: загрузка VFS из ZIP-архива.
 - `src/commands/VfsTreeCommand.hpp/.cpp`: печать поддерева VFS.
 - `src/commands/VfsReadCommand.hpp/.cpp`: чтение файла VFS.
 - `src/vfs/VfsNode.hpp`: узел дерева VFS.
 - `src/vfs/Vfs.hpp/.cpp`: дерево VFS в памяти, построение из записей,
-  `resolve`, `resolveFrom` и `listPaths`.
+  `resolve`, `resolveFrom`, `listPaths`, `removeEntry` и `moveEntry`.
 - `src/vfs/ZipReader.hpp/.cpp`: чтение ZIP-архива в память без распаковки на
   диск (STORE и DEFLATE).
 - `src/vfs/Inflate.hpp/.cpp`: собственная распаковка DEFLATE (RFC 1951).
@@ -63,7 +66,7 @@ JSON Lines-логированием и стартовым скриптом.
 - `src/script/ScriptRunner.hpp/.cpp`: последовательное выполнение стартового
   скрипта с отображением приглашения и команды.
 - `tests/`: собственный мини-фреймворк и тесты лексера, парсера, приглашения,
-  команд, команд VFS, файловых команд этапа 4, конфигурации, логгера,
+  команд, команд VFS, файловых команд этапов 4–5, конфигурации, логгера,
   стартового скрипта и ограничений репозитория.
 - `run.sh` и `run.bat`: сборка, запуск приложения и запуск тестов.
 - `scripts/`: демонстрационные `.bat` и `.sh` сценарии, XML-конфигурация и
@@ -173,11 +176,14 @@ ctest --test-dir build --output-on-failure
 - `test_commands.*` запускает эмулятор с архивом `nested.zip` и стартовым
   скриптом `startup_commands.txt`, демонстрируя `ls`, `cd`, `wc`, `find` и
   `who`.
+- `test_extra.*` запускает эмулятор с архивом `several.zip` и стартовым
+  скриптом `startup_extra.txt`, демонстрируя `rm` и `mv`.
 - `config.xml` содержит пример конфигурации.
 - `startup_demo.txt` демонстрирует успешные команды, кавычки и пропуск
   ошибок.
 - `startup_vfs.txt` демонстрирует команды этапов 1–3, включая VFS.
 - `startup_commands.txt` демонстрирует файловые команды этапа 4.
+- `startup_extra.txt` демонстрирует удаление и перемещение этапа 5.
 
 Все сценарии после запуска печатают созданный лог-файл.
 
@@ -263,7 +269,24 @@ ZIP-файлов, которые создают скрипты `make_vfs`.
   `find: invalid argument for -type: <value>`.
 - `who` — печатает `username hostname`. Ошибка: `who: too many arguments`.
 
-## 12. Примеры запуска
+## 12. Команды этапа 5: rm, mv
+
+- `rm [-r] [-f] <path>...` — удаляет узлы VFS. Каталог удаляется только с
+  флагом `-r` (или `-R`); без него выводится `rm: is a directory: <path>`.
+  Флаг `-f` подавляет ошибку отсутствующего пути. Корень `/` удалить нельзя.
+  Ошибки: `rm: missing operand`, `rm: invalid option: -<x>`,
+  `rm: no such file: <path>`, `rm: is a directory: <path>`,
+  `rm: cannot remove root: /`.
+- `mv <source> <destination>` — переименовывает узел или перемещает его.
+  Если `<destination>` — существующий каталог, источник перемещается внутрь
+  него с прежним именем. Существующий файл-цель перезаписывается. Каталог
+  нельзя переместить внутрь себя. Ошибки: `mv: missing file operand`,
+  `mv: missing destination file operand after '<source>'`,
+  `mv: too many arguments`, `mv: no such file: <source>`,
+  `mv: invalid target: <destination>`, `mv: cannot move root: /`,
+  `mv: cannot move a directory into itself: <source>`.
+
+## 13. Примеры запуска
 
 Только CLI:
 
@@ -278,7 +301,7 @@ ZIP-файлов, которые создают скрипты `make_vfs`.
 ./build/shell-emulator --config ./scripts/config.xml
 ```
 
-## 13. Пример REPL
+## 14. Пример REPL
 
 Пример предполагает, что `HOME` равен `/home/alice`, а VFS содержит `/data`,
 `/data/one.txt` и `/notes.txt`:

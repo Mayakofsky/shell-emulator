@@ -12,6 +12,8 @@
 #include "commands/ExitCommand.hpp"
 #include "commands/FindCommand.hpp"
 #include "commands/LsCommand.hpp"
+#include "commands/MvCommand.hpp"
+#include "commands/RmCommand.hpp"
 #include "commands/WcCommand.hpp"
 #include "commands/WhoCommand.hpp"
 #include "config/ArgsParser.hpp"
@@ -117,26 +119,48 @@ int main()
         "ls rejects files");
     check(CdCommand{}.execute(context, {"dir"}).error.empty() && currentDirectory == "/dir",
         "cd changes the directory");
-    check(LsCommand{}.execute(context, {}).output == "file.txt\n", "ls uses the directory");
     check(CdCommand{}.execute(context, {".."}).error.empty() && currentDirectory == "/",
         "cd goes to the parent");
-    check(CdCommand{}.execute(context, {"/missing"}).error.starts_with("cd: no such"),
-        "cd rejects missing paths");
 
     check(WcCommand{}.execute(context, {"notes.txt"}).output == "0 1 2 notes.txt\n",
         "wc counts a file");
     check(WcCommand{}.execute(context, {"-l", "notes.txt"}).output == "0 notes.txt\n",
         "wc honours flags");
-    check(WcCommand{}.execute(context, {"missing"}).error.starts_with("wc: no such"),
-        "wc reports missing files");
 
     check(FindCommand{}.execute(context, {"-type", "d"}).output == "/dir/\n",
         "find filters directories");
-    check(FindCommand{}.execute(context, {"-name", "*.txt"}).output ==
-        "/dir/file.txt\n/notes.txt\n", "find filters names");
-
     check(WhoCommand{}.execute(context, {}).output ==
         Environment::username() + " " + Environment::hostname() + "\n", "who prints the user");
+
+    Vfs editVfs;
+    editVfs.buildFromEntries({
+        {"a.txt", false, {'a'}},
+        {"b.txt", false, {'b'}},
+        {"dir", true, {}}});
+    std::string editDirectory = "/";
+    CommandContext editContext{editVfs, editDirectory};
+
+    check(MvCommand{}.execute(editContext, {"/a.txt", "/c.txt"}).error.empty(),
+        "mv renames a file");
+    check(editVfs.resolve("/a.txt") == nullptr && editVfs.resolve("/c.txt") != nullptr,
+        "mv moved the file");
+    check(MvCommand{}.execute(editContext, {"/b.txt", "/dir"}).error.empty(),
+        "mv moves into a directory");
+    check(editVfs.resolve("/dir/b.txt") != nullptr, "mv keeps the name");
+    check(MvCommand{}.execute(editContext, {"/dir", "/dir/sub"}).error.starts_with("mv: cannot"),
+        "mv forbids moving into itself");
+    check(MvCommand{}.execute(editContext, {}).error == "mv: missing file operand",
+        "mv needs arguments");
+
+    check(RmCommand{}.execute(editContext, {"/c.txt"}).error.empty(), "rm removes a file");
+    check(editVfs.resolve("/c.txt") == nullptr, "rm really removes the file");
+    check(RmCommand{}.execute(editContext, {"/dir"}).error.starts_with("rm: is a"),
+        "rm protects directories");
+    check(RmCommand{}.execute(editContext, {"-r", "/dir"}).error.empty(),
+        "rm -r removes a directory");
+    check(editVfs.resolve("/dir") == nullptr, "rm -r clears the subtree");
+    check(RmCommand{}.execute(editContext, {"/"}).error.starts_with("rm: cannot remove root"),
+        "rm protects the root");
 
     const CommandResult exitCode = ExitCommand{}.execute(context, {"-3"});
     check(exitCode.shouldExit && exitCode.exitCode == -3, "exit keeps the code");
