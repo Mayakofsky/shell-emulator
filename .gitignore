@@ -14,3 +14,5 @@ Makefile
 .vscode/
 .idea/
 .DS_Store
+*.log
+*.jsonl

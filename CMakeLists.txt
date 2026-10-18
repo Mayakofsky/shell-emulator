@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(shellcore
+    src/config/ArgsParser.cpp
+    src/config/ConfigFileReader.cpp
+    src/config/ConfigLoader.cpp
     src/shell/Environment.cpp
     src/shell/PromptBuilder.cpp
     src/shell/Lexer.cpp
@@ -15,6 +18,8 @@ add_library(shellcore
     src/commands/LsCommand.cpp
     src/commands/CdCommand.cpp
     src/commands/ExitCommand.cpp
+    src/log/JsonLogger.cpp
+    src/script/ScriptRunner.cpp
 )
 
 target_include_directories(shellcore PUBLIC src)

@@ -1,0 +1,8 @@
+ls -la
+ls "$HOME/demo folder"
+cd demo
+cd one two
+unknown-command
+ls "quoted value"
+exit 0
+ls after-exit
