@@ -1,0 +1,1 @@
+Guide body for the "several" VFS sample.

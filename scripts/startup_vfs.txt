@@ -1,0 +1,19 @@
+vfs-tree /
+vfs-read /readme.txt
+vfs-read /notes.txt
+vfs-read /docs/guide.txt
+vfs-tree /docs
+vfs-load data/vfs/several.zip
+vfs-tree /
+ls -la
+cd demo
+cd one two
+vfs-tree /missing
+vfs-read /missing.txt
+vfs-read /docs
+vfs-load missing-archive.zip
+vfs-load
+unknown-command
+vfs-read $HOME/secret
+exit 0
+vfs-read /after-exit

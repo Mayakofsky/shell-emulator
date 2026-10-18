@@ -7,7 +7,8 @@ std::string_view CdCommand::name() const
     return "cd";
 }
 
-CommandResult CdCommand::execute(const std::vector<std::string>& arguments) const
+CommandResult CdCommand::execute([[maybe_unused]] CommandContext& context,
+    const std::vector<std::string>& arguments) const
 {
     if (arguments.size() > 1)
     {

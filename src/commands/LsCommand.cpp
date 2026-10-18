@@ -7,7 +7,8 @@ std::string_view LsCommand::name() const
     return "ls";
 }
 
-CommandResult LsCommand::execute(const std::vector<std::string>& arguments) const
+CommandResult LsCommand::execute([[maybe_unused]] CommandContext& context,
+    const std::vector<std::string>& arguments) const
 {
     std::ostringstream output;
     output << name() << " called with args: [";

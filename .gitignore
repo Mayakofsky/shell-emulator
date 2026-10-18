@@ -16,3 +16,5 @@ Makefile
 .DS_Store
 *.log
 *.jsonl
+*.zip
+data/vfs/*.zip

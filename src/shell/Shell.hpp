@@ -3,6 +3,7 @@
 #include "Parser.hpp"
 #include "PromptBuilder.hpp"
 #include "commands/CommandRegistry.hpp"
+#include "vfs/Vfs.hpp"
 
 #include <csignal>
 #include <iosfwd>
@@ -22,7 +23,8 @@ public:
     int executeLine(const std::string& line, std::ostream& output, std::ostream& error);
     std::string prompt() const;
     bool lastCommandExited() const;
-
+    bool loadVfs(const std::string& path, std::string& error);
+    std::size_t vfsEntryCount() const;
 private:
     static void handleInterrupt(int signalNumber);
     std::string buildPrompt() const;
@@ -35,4 +37,6 @@ private:
     JsonLogger* logger_ = nullptr;
     std::optional<std::string> startupScript_;
     bool lastCommandExited_ = false;
+    Vfs vfs_;
+    std::string currentDirectory_ = "/";
 };

@@ -18,8 +18,15 @@ add_library(shellcore
     src/commands/LsCommand.cpp
     src/commands/CdCommand.cpp
     src/commands/ExitCommand.cpp
+    src/commands/VfsLoadCommand.cpp
+    src/commands/VfsReadCommand.cpp
+    src/commands/VfsTreeCommand.cpp
     src/log/JsonLogger.cpp
     src/script/ScriptRunner.cpp
+    src/vfs/Base64.cpp
+    src/vfs/Inflate.cpp
+    src/vfs/Vfs.cpp
+    src/vfs/ZipReader.cpp
 )
 
 target_include_directories(shellcore PUBLIC src)

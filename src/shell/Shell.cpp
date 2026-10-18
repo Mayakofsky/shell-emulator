@@ -1,6 +1,7 @@
 #include "Shell.hpp"
 
 #include "Environment.hpp"
+#include "commands/CommandContext.hpp"
 #include "log/JsonLogger.hpp"
 #include "script/ScriptRunner.hpp"
 
@@ -13,6 +14,22 @@ volatile std::sig_atomic_t Shell::interrupted_ = 0;
 Shell::Shell(JsonLogger* logger, std::optional<std::string> startupScript)
     : logger_(logger), startupScript_(std::move(startupScript))
 {
+}
+
+bool Shell::loadVfs(const std::string& path, std::string& error)
+{
+    Vfs loaded;
+    if (!loaded.loadFromArchive(path, error))
+    {
+        return false;
+    }
+    vfs_ = std::move(loaded);
+    return true;
+}
+
+std::size_t Shell::vfsEntryCount() const
+{
+    return vfs_.entryCount();
 }
 
 void Shell::installSignalHandler()
@@ -83,7 +100,9 @@ int Shell::executeLine(const std::string& line, std::ostream& output, std::ostre
         return 0;
     }
 
-    const CommandResult result = commandRegistry_.execute(parsed.command, parsed.arguments);
+    CommandContext context{vfs_, currentDirectory_};
+    const CommandResult result =
+        commandRegistry_.execute(context, parsed.command, parsed.arguments);
     const std::string status = result.shouldExit ? "exit" :
         (result.error.empty() ? (commandRegistry_.contains(parsed.command) ? "ok" : "unknown") :
         (commandRegistry_.contains(parsed.command) ? "error" : "unknown"));

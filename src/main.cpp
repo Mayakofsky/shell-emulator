@@ -58,5 +58,16 @@ int main(int argc, char* argv[])
     }
 
     Shell shell(logger.get(), loaded.configuration.scriptPath);
+    if (loaded.configuration.vfsPath)
+    {
+        std::string vfsError;
+        if (!shell.loadVfs(*loaded.configuration.vfsPath, vfsError))
+        {
+            std::cerr << "shell: vfs error: " << vfsError << '\n';
+            return 1;
+        }
+        std::cout << "vfs: loaded " << shell.vfsEntryCount() << " entries from "
+                  << *loaded.configuration.vfsPath << '\n';
+    }
     return shell.run();
 }

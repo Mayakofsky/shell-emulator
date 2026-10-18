@@ -6,5 +6,6 @@ LOG="${TMPDIR:-/tmp}/shell-priority.jsonl"
 cd "$ROOT"
 cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$BUILD" --config Release
-"$BUILD/shell-emulator" --config "$ROOT/scripts/config.xml" --vfs cli-vfs --log "$LOG" < /dev/null
+bash "$ROOT/scripts/make_vfs.sh"
+"$BUILD/shell-emulator" --config "$ROOT/scripts/config.xml" --vfs "$ROOT/data/vfs/minimal.zip" --log "$LOG" < /dev/null
 cat "$LOG"

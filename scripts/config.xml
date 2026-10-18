@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
-  <vfs>./data/vfs</vfs>
+  <vfs>./data/vfs/several.zip</vfs>
   <log>./data/config-log.jsonl</log>
   <script>./scripts/startup_demo.txt</script>
 </config>

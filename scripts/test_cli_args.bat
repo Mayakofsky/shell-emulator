@@ -8,7 +8,9 @@ cmake -S "%ROOT%" -B "%BUILD%" -DCMAKE_BUILD_TYPE=Release
 if errorlevel 1 exit /b %errorlevel%
 cmake --build "%BUILD%" --config Release
 if errorlevel 1 exit /b %errorlevel%
-"%BUILD%\shell-emulator.exe" --vfs "%ROOT%\data\vfs" --log "%LOG%" ^
+call "%ROOT%\scripts\make_vfs.bat"
+if errorlevel 1 exit /b %errorlevel%
+"%BUILD%\shell-emulator.exe" --vfs "%ROOT%\data\vfs\several.zip" --log "%LOG%" ^
     --script "%ROOT%\scripts\startup_demo.txt" --config "%ROOT%\scripts\config.xml" <NUL
 type "%LOG%"
 endlocal

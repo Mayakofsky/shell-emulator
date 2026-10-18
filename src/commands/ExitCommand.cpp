@@ -31,7 +31,8 @@ std::string_view ExitCommand::name() const
     return "exit";
 }
 
-CommandResult ExitCommand::execute(const std::vector<std::string>& arguments) const
+CommandResult ExitCommand::execute([[maybe_unused]] CommandContext& context,
+    const std::vector<std::string>& arguments) const
 {
     if (arguments.size() > 1)
     {

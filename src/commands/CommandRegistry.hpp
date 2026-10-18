@@ -12,7 +12,7 @@ class CommandRegistry
 public:
     CommandRegistry();
     void registerCommand(std::unique_ptr<Command> command);
-    CommandResult execute(
+    CommandResult execute(CommandContext& context,
         const std::string& name,
         const std::vector<std::string>& arguments) const;
     bool contains(const std::string& name) const;

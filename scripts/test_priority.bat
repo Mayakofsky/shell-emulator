@@ -9,6 +9,8 @@ cmake -S "%ROOT%" -B "%BUILD%" -DCMAKE_BUILD_TYPE=Release
 if errorlevel 1 exit /b %errorlevel%
 cmake --build "%BUILD%" --config Release
 if errorlevel 1 exit /b %errorlevel%
-"%BUILD%\shell-emulator.exe" --config "%CONFIG%" --vfs cli-vfs --log "%LOG%" <NUL
+call "%ROOT%\scripts\make_vfs.bat"
+if errorlevel 1 exit /b %errorlevel%
+"%BUILD%\shell-emulator.exe" --config "%CONFIG%" --vfs "%ROOT%\data\vfs\minimal.zip" --log "%LOG%" <NUL
 type "%LOG%"
 endlocal

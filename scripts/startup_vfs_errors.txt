@@ -1,0 +1,10 @@
+vfs-tree /missing
+vfs-tree /notes.txt/../missing
+vfs-read /missing.txt
+vfs-read /docs
+vfs-read
+vfs-load missing-archive.zip
+vfs-load too many arguments
+vfs-tree /docs/guide.txt
+vfs-read /docs/guide.txt
+exit 0

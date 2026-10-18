@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -5,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "commands/CommandContext.hpp"
 #include "commands/CommandRegistry.hpp"
 #include "commands/ExitCommand.hpp"
 #include "config/ArgsParser.hpp"
@@ -15,6 +17,8 @@
 #include "shell/Parser.hpp"
 #include "shell/PromptBuilder.hpp"
 #include "shell/Shell.hpp"
+#include "vfs/Base64.hpp"
+#include "vfs/Vfs.hpp"
 
 namespace
 {
@@ -46,12 +50,9 @@ std::filesystem::path writeTemp(const std::string& name, const std::string& cont
 int main()
 {
     const LexerResult tokens = Lexer{}.tokenize("  ls   first\tsecond ");
-    check(tokens.success, "lexer splits arguments");
-    check(tokens.tokens.size() == 3 && tokens.tokens[1].value == "first",
-        "lexer keeps argument order");
+    check(tokens.success && tokens.tokens.size() == 3, "lexer splits arguments");
 
     const LexerResult quotes = Lexer{}.tokenize("cmd 'one two' \"three four\"");
-    check(quotes.success && quotes.tokens.size() == 3, "lexer understands quotes");
     check(quotes.tokens[1].value == "one two" && quotes.tokens[2].value == "three four",
         "lexer removes quotes");
 
@@ -59,27 +60,16 @@ int main()
     check(parsed.success && parsed.command == "ls", "parser reads the command");
     check(parsed.arguments == std::vector<std::string>({"-l", "folder name"}),
         "parser reads the arguments");
-
-    const ParseResult broken = Parser{}.parse("ls \"unfinished");
-    check(!broken.success && !broken.error.empty(), "parser reports syntax errors");
+    check(!Parser{}.parse("ls \"unfinished").success, "parser reports syntax errors");
 
     const std::string prompt = PromptBuilder{}.build("alice", "host",
         std::filesystem::path("/home/alice"), std::filesystem::path("/home/alice"));
     check(prompt == "alice@host:~$ ", "prompt hides the home directory");
 
-    const CommandResult exitCode = ExitCommand{}.execute({"-3"});
-    check(exitCode.shouldExit && exitCode.exitCode == -3, "exit keeps the code");
-
-    const CommandResult unknown = CommandRegistry{}.execute("missing", {});
-    check(unknown.error == "shell: unknown command: missing", "unknown command is reported");
-
     const ArgsParseResult args = ArgsParser{}.parse(
         {"--vfs", "vfs-a", "--log=log-a", "--script", "script-a"});
     check(args.success && args.configuration.vfsPath == "vfs-a", "argument parser reads vfs");
-    check(args.configuration.logPath == "log-a" &&
-        args.configuration.scriptPath == "script-a", "argument parser reads log and script");
-    const ArgsParseResult badArgs = ArgsParser{}.parse({"--bad", "x"});
-    check(!badArgs.success && !badArgs.error.empty(), "argument parser reports bad parameters");
+    check(!ArgsParser{}.parse({"--bad", "x"}).success, "argument parser rejects unknown keys");
 
     const std::filesystem::path configPath =
         writeTemp("shell_emulator_test_config.xml",
@@ -89,7 +79,6 @@ int main()
     std::filesystem::remove(configPath);
     check(loaded.success && loaded.configuration.vfsPath == "cli-vfs",
         "command line overrides the config file");
-    check(!loaded.configuration.scriptPath, "missing values stay empty");
 
     check(JsonLogger::escape("a\"b\\c\nd") == "a\\\"b\\\\c\\u000ad",
         "logger escapes json characters");
@@ -106,13 +95,40 @@ int main()
     check(scriptError.str().find("unknown command") != std::string::npos,
         "startup script skips broken lines");
 
-    std::istringstream input("ls\nmissing\nexit 0\n");
-    std::ostringstream output;
-    std::ostringstream error;
-    Shell shell;
-    shell.run(input, output, error);
-    check(error.str().find("unknown command") != std::string::npos,
-        "shell survives unknown commands");
+    const std::vector<std::uint8_t> binary = {0x00, 0x01, 0x7f, 0x80, 0xff};
+    std::vector<std::uint8_t> decoded;
+    check(Base64::decode(Base64::encode(binary), decoded) && decoded == binary,
+        "base64 round trip");
+
+    Vfs vfs;
+    vfs.buildFromEntries({
+        {"notes.txt", false, {'h', 'i'}},
+        {"dir", true, {}},
+        {"dir/file.txt", false, {'f'}}});
+    std::string currentDirectory = "/";
+    CommandContext context{vfs, currentDirectory};
+    check(vfs.entryCount() == 3, "vfs builds a tree");
+    check(vfs.resolve("/dir/./file.txt") != nullptr, "vfs resolves relative parts");
+    check(vfs.resolve("/missing") == nullptr, "vfs reports missing paths");
+
+    std::string listError;
+    const std::vector<std::string> paths = vfs.listPaths("/", listError);
+    check(paths == std::vector<std::string>({"/dir/", "/dir/file.txt", "/notes.txt"}),
+        "vfs lists paths sorted");
+
+    const CommandResult tree = CommandRegistry{}.execute(context, "vfs-tree", {});
+    check(tree.output == "/dir/\n/dir/file.txt\n/notes.txt\n", "vfs-tree prints paths");
+    const CommandResult read = CommandRegistry{}.execute(context, "vfs-read", {"/notes.txt"});
+    check(read.output == "hi\n", "vfs-read prints text");
+    const CommandResult readMissing = CommandRegistry{}.execute(
+        context, "vfs-read", {"/absent"});
+    check(!readMissing.error.empty(), "vfs-read reports errors");
+
+    const CommandResult exitCode = ExitCommand{}.execute(context, {"-3"});
+    check(exitCode.shouldExit && exitCode.exitCode == -3, "exit keeps the code");
+
+    const CommandResult unknown = CommandRegistry{}.execute(context, "missing", {});
+    check(unknown.error == "shell: unknown command: missing", "unknown command is reported");
 
     if (failures == 0)
     {

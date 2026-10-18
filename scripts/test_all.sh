@@ -6,6 +6,7 @@ LOG="${TMPDIR:-/tmp}/shell-all.jsonl"
 cd "$ROOT"
 cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$BUILD" --config Release
-"$BUILD/shell-emulator" --config "$ROOT/scripts/config.xml" --vfs cli-vfs \
+bash "$ROOT/scripts/make_vfs.sh"
+"$BUILD/shell-emulator" --config "$ROOT/scripts/config.xml" --vfs "$ROOT/data/vfs/several.zip" \
     --log "$LOG" --script "$ROOT/scripts/startup_demo.txt" < /dev/null
 cat "$LOG"

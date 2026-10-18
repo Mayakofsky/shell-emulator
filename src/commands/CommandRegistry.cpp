@@ -3,12 +3,18 @@
 #include "CdCommand.hpp"
 #include "ExitCommand.hpp"
 #include "LsCommand.hpp"
+#include "VfsLoadCommand.hpp"
+#include "VfsReadCommand.hpp"
+#include "VfsTreeCommand.hpp"
 
 CommandRegistry::CommandRegistry()
 {
     registerCommand(std::make_unique<LsCommand>());
     registerCommand(std::make_unique<CdCommand>());
     registerCommand(std::make_unique<ExitCommand>());
+    registerCommand(std::make_unique<VfsLoadCommand>());
+    registerCommand(std::make_unique<VfsTreeCommand>());
+    registerCommand(std::make_unique<VfsReadCommand>());
 }
 
 void CommandRegistry::registerCommand(std::unique_ptr<Command> command)
@@ -20,7 +26,7 @@ void CommandRegistry::registerCommand(std::unique_ptr<Command> command)
     }
 }
 
-CommandResult CommandRegistry::execute(
+CommandResult CommandRegistry::execute(CommandContext& context,
     const std::string& name,
     const std::vector<std::string>& arguments) const
 {
@@ -29,7 +35,7 @@ CommandResult CommandRegistry::execute(
     {
         return CommandResult{{}, "shell: unknown command: " + name, false, 0};
     }
-    return command->second->execute(arguments);
+    return command->second->execute(context, arguments);
 }
 
 bool CommandRegistry::contains(const std::string& name) const
