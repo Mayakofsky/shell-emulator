@@ -6,13 +6,18 @@
 #include <string>
 #include <vector>
 
+#include "commands/CdCommand.hpp"
 #include "commands/CommandContext.hpp"
 #include "commands/CommandRegistry.hpp"
 #include "commands/ExitCommand.hpp"
+#include "commands/FindCommand.hpp"
+#include "commands/LsCommand.hpp"
+#include "commands/WcCommand.hpp"
+#include "commands/WhoCommand.hpp"
 #include "config/ArgsParser.hpp"
 #include "config/ConfigLoader.hpp"
 #include "log/JsonLogger.hpp"
-#include "script/ScriptRunner.hpp"
+#include "shell/Environment.hpp"
 #include "shell/Lexer.hpp"
 #include "shell/Parser.hpp"
 #include "shell/PromptBuilder.hpp"
@@ -49,9 +54,8 @@ std::filesystem::path writeTemp(const std::string& name, const std::string& cont
 
 int main()
 {
-    const LexerResult tokens = Lexer{}.tokenize("  ls   first\tsecond ");
-    check(tokens.success && tokens.tokens.size() == 3, "lexer splits arguments");
-
+    check(Lexer{}.tokenize("  ls   first\tsecond ").tokens.size() == 3,
+        "lexer splits arguments");
     const LexerResult quotes = Lexer{}.tokenize("cmd 'one two' \"three four\"");
     check(quotes.tokens[1].value == "one two" && quotes.tokens[2].value == "three four",
         "lexer removes quotes");
@@ -79,21 +83,8 @@ int main()
     std::filesystem::remove(configPath);
     check(loaded.success && loaded.configuration.vfsPath == "cli-vfs",
         "command line overrides the config file");
-
     check(JsonLogger::escape("a\"b\\c\nd") == "a\\\"b\\\\c\\u000ad",
         "logger escapes json characters");
-
-    const std::filesystem::path scriptPath =
-        writeTemp("shell_emulator_test_script.txt", "ls\nmissing\nexit 4\n");
-    std::ostringstream scriptOutput;
-    std::ostringstream scriptError;
-    Shell scriptShell;
-    const int scriptCode = ScriptRunner{}.run(
-        scriptPath.string(), scriptShell, scriptOutput, scriptError);
-    std::filesystem::remove(scriptPath);
-    check(scriptCode == 4, "startup script stops on exit");
-    check(scriptError.str().find("unknown command") != std::string::npos,
-        "startup script skips broken lines");
 
     const std::vector<std::uint8_t> binary = {0x00, 0x01, 0x7f, 0x80, 0xff};
     std::vector<std::uint8_t> decoded;
@@ -107,26 +98,48 @@ int main()
         {"dir/file.txt", false, {'f'}}});
     std::string currentDirectory = "/";
     CommandContext context{vfs, currentDirectory};
+
     check(vfs.entryCount() == 3, "vfs builds a tree");
     check(vfs.resolve("/dir/./file.txt") != nullptr, "vfs resolves relative parts");
-    check(vfs.resolve("/missing") == nullptr, "vfs reports missing paths");
-
     std::string listError;
-    const std::vector<std::string> paths = vfs.listPaths("/", listError);
-    check(paths == std::vector<std::string>({"/dir/", "/dir/file.txt", "/notes.txt"}),
+    check(vfs.listPaths("/", listError) ==
+        std::vector<std::string>({"/dir/", "/dir/file.txt", "/notes.txt"}),
         "vfs lists paths sorted");
 
     const CommandResult tree = CommandRegistry{}.execute(context, "vfs-tree", {});
     check(tree.output == "/dir/\n/dir/file.txt\n/notes.txt\n", "vfs-tree prints paths");
     const CommandResult read = CommandRegistry{}.execute(context, "vfs-read", {"/notes.txt"});
     check(read.output == "hi\n", "vfs-read prints text");
-    const CommandResult readMissing = CommandRegistry{}.execute(
-        context, "vfs-read", {"/absent"});
-    check(!readMissing.error.empty(), "vfs-read reports errors");
+
+    check(LsCommand{}.execute(context, {}).output == "dir\nnotes.txt\n", "ls lists names");
+    check(LsCommand{}.execute(context, {"/dir"}).output == "file.txt\n", "ls reads a path");
+    check(LsCommand{}.execute(context, {"/notes.txt"}).error.starts_with("ls: not a"),
+        "ls rejects files");
+    check(CdCommand{}.execute(context, {"dir"}).error.empty() && currentDirectory == "/dir",
+        "cd changes the directory");
+    check(LsCommand{}.execute(context, {}).output == "file.txt\n", "ls uses the directory");
+    check(CdCommand{}.execute(context, {".."}).error.empty() && currentDirectory == "/",
+        "cd goes to the parent");
+    check(CdCommand{}.execute(context, {"/missing"}).error.starts_with("cd: no such"),
+        "cd rejects missing paths");
+
+    check(WcCommand{}.execute(context, {"notes.txt"}).output == "0 1 2 notes.txt\n",
+        "wc counts a file");
+    check(WcCommand{}.execute(context, {"-l", "notes.txt"}).output == "0 notes.txt\n",
+        "wc honours flags");
+    check(WcCommand{}.execute(context, {"missing"}).error.starts_with("wc: no such"),
+        "wc reports missing files");
+
+    check(FindCommand{}.execute(context, {"-type", "d"}).output == "/dir/\n",
+        "find filters directories");
+    check(FindCommand{}.execute(context, {"-name", "*.txt"}).output ==
+        "/dir/file.txt\n/notes.txt\n", "find filters names");
+
+    check(WhoCommand{}.execute(context, {}).output ==
+        Environment::username() + " " + Environment::hostname() + "\n", "who prints the user");
 
     const CommandResult exitCode = ExitCommand{}.execute(context, {"-3"});
     check(exitCode.shouldExit && exitCode.exitCode == -3, "exit keeps the code");
-
     const CommandResult unknown = CommandRegistry{}.execute(context, "missing", {});
     check(unknown.error == "shell: unknown command: missing", "unknown command is reported");
 

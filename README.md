@@ -2,16 +2,18 @@
 
 ## 1. Описание проекта и этап
 
-Проект для дисциплины «Конфигурационное управление», вариант №7. Этап 3
-добавляет виртуальную файловую систему (VFS), которая загружается из
-ZIP-архива целиком в память, и служебные команды `vfs-load`, `vfs-tree`,
-`vfs-read`. Этап 2 расширяет REPL настройкой через CLI и XML, JSON
-Lines-логированием и стартовым скриптом.
+Проект для дисциплины «Конфигурационное управление», вариант №7. Этап 4
+делает команды `ls` и `cd` рабочими поверх VFS и добавляет команды `wc`,
+`find` и `who`. Этап 3 добавил виртуальную файловую систему (VFS),
+загружаемую из ZIP-архива целиком в память, и служебные команды `vfs-load`,
+`vfs-tree`, `vfs-read`. Этап 2 расширил REPL настройкой через CLI и XML,
+JSON Lines-логированием и стартовым скриптом.
 Сохраняются приглашение из данных ОС, разбор командной строки, раскрытие
-переменных окружения и команды-заглушки `ls`, `cd` и `exit`.
+переменных окружения и команда `exit`.
 
-Команда `cd` по-прежнему проверяет аргументы, но не меняет текущий каталог.
-VFS доступна только через команды `vfs-*`; на диск архив не распаковывается.
+Текущий каталог оболочки (`cd`) — это путь внутри VFS, а приглашение
+по-прежнему строится из каталога реальной ОС. VFS доступна только через
+команды; на диск архив не распаковывается.
 
 ## 2. Функции, классы и файлы
 
@@ -35,14 +37,19 @@ VFS доступна только через команды `vfs-*`; на дис
   к VFS и текущему каталогу.
 - `src/commands/CommandRegistry.hpp/.cpp`: реестр команд и обработка неизвестных
   имён.
-- `src/commands/LsCommand.hpp/.cpp` и `CdCommand.hpp/.cpp`: команды-заглушки.
+- `src/commands/LsCommand.hpp/.cpp`: вывод имён каталога VFS.
+- `src/commands/CdCommand.hpp/.cpp`: смена текущего каталога VFS.
+- `src/commands/WcCommand.hpp/.cpp`: подсчёт строк, слов и байт файлов VFS.
+- `src/commands/FindCommand.hpp/.cpp`: обход поддерева VFS с фильтрами
+  `-name` и `-type`.
+- `src/commands/WhoCommand.hpp/.cpp`: печать имени пользователя и хоста.
 - `src/commands/ExitCommand.hpp/.cpp`: проверка аргумента и завершение REPL.
 - `src/commands/VfsLoadCommand.hpp/.cpp`: загрузка VFS из ZIP-архива.
 - `src/commands/VfsTreeCommand.hpp/.cpp`: печать поддерева VFS.
 - `src/commands/VfsReadCommand.hpp/.cpp`: чтение файла VFS.
 - `src/vfs/VfsNode.hpp`: узел дерева VFS.
 - `src/vfs/Vfs.hpp/.cpp`: дерево VFS в памяти, построение из записей,
-  `resolve` и `listPaths`.
+  `resolve`, `resolveFrom` и `listPaths`.
 - `src/vfs/ZipReader.hpp/.cpp`: чтение ZIP-архива в память без распаковки на
   диск (STORE и DEFLATE).
 - `src/vfs/Inflate.hpp/.cpp`: собственная распаковка DEFLATE (RFC 1951).
@@ -56,8 +63,8 @@ VFS доступна только через команды `vfs-*`; на дис
 - `src/script/ScriptRunner.hpp/.cpp`: последовательное выполнение стартового
   скрипта с отображением приглашения и команды.
 - `tests/`: собственный мини-фреймворк и тесты лексера, парсера, приглашения,
-  команд, конфигурации, логгера, стартового скрипта и ограничений
-  репозитория.
+  команд, команд VFS, файловых команд этапа 4, конфигурации, логгера,
+  стартового скрипта и ограничений репозитория.
 - `run.sh` и `run.bat`: сборка, запуск приложения и запуск тестов.
 - `scripts/`: демонстрационные `.bat` и `.sh` сценарии, XML-конфигурация и
   стартовый скрипт.
@@ -163,10 +170,14 @@ ctest --test-dir build --output-on-failure
   заготовок `data/vfs_samples/`.
 - `test_vfs_minimal.*`, `test_vfs_several.*`, `test_vfs_nested.*` и
   `test_vfs_errors.*` проверяют варианты VFS и обработку ошибок.
+- `test_commands.*` запускает эмулятор с архивом `nested.zip` и стартовым
+  скриптом `startup_commands.txt`, демонстрируя `ls`, `cd`, `wc`, `find` и
+  `who`.
 - `config.xml` содержит пример конфигурации.
 - `startup_demo.txt` демонстрирует успешные команды, кавычки и пропуск
   ошибок.
-- `startup_vfs.txt` демонстрирует все команды этапов 1–3, включая VFS.
+- `startup_vfs.txt` демонстрирует команды этапов 1–3, включая VFS.
+- `startup_commands.txt` демонстрирует файловые команды этапа 4.
 
 Все сценарии после запуска печатают созданный лог-файл.
 
@@ -224,7 +235,35 @@ ZIP-файлов, которые создают скрипты `make_vfs`.
 - `startup_vfs.txt` демонстрирует успешные и ошибочные вызовы `vfs-*`,
   переменные окружения и пропуск ошибочных строк.
 
-## 11. Примеры запуска
+## 11. Команды этапа 4: ls, cd, wc, find, who
+
+Все команды работают с VFS. Относительные пути вычисляются от текущего
+каталога оболочки, который меняет `cd`.
+
+- `ls [path]` — имена детей каталога по одному на строку, отсортированные
+  лексикографически, без завершающего `/`. Без аргумента берётся текущий
+  каталог. Ошибки: `ls: no such path: <path>`, `ls: not a directory: <path>`,
+  `ls: too many arguments`.
+- `cd [path]` — смена текущего каталога. Без аргумента переходит в `/`.
+  Ошибки: `cd: no such directory: <path>`, `cd: not a directory: <path>`,
+  `cd: too many arguments`.
+- `wc [-l] [-w] [-c] <file>...` — для каждого файла печатает
+  `lines words bytes path`; при нескольких файлах добавляется строка
+  `lines words bytes total`. Флаги `-l`, `-w`, `-c` (можно вместе)
+  оставляют только выбранные счётчики; без флагов печатаются все три.
+  Словом считается непрерывная последовательность непробельных байтов.
+  Ошибки: `wc: missing file operand`, `wc: no such file: <path>`,
+  `wc: is a directory: <path>`, `wc: invalid option: -<x>`.
+- `find [path] [-name <glob>] [-type f|d]` — обходит поддерево и печатает
+  полные пути, отсортированные лексикографически, каталоги с завершающим `/`.
+  Без аргумента обходит текущий каталог. Маска `-name` понимает `*` и `?`;
+  `-type` ограничивает файлами (`f`) или каталогами (`d`). Ошибки:
+  `find: no such path: <path>`, `find: unknown predicate: <arg>`,
+  `find: missing argument for -name`,
+  `find: invalid argument for -type: <value>`.
+- `who` — печатает `username hostname`. Ошибка: `who: too many arguments`.
+
+## 12. Примеры запуска
 
 Только CLI:
 
@@ -239,15 +278,25 @@ ZIP-файлов, которые создают скрипты `make_vfs`.
 ./build/shell-emulator --config ./scripts/config.xml
 ```
 
-## 12. Пример REPL
+## 13. Пример REPL
 
-Пример предполагает, что `HOME` равен `/home/alice`:
+Пример предполагает, что `HOME` равен `/home/alice`, а VFS содержит `/data`,
+`/data/one.txt` и `/notes.txt`:
 
 ```text
-alice@workstation:~$ ls "$HOME/My Folder"
-ls called with args: [/home/alice/My Folder]
-alice@workstation:~$ cd 'folder with spaces'
-cd called with args: [folder with spaces]
+alice@workstation:~$ ls
+data
+notes.txt
+alice@workstation:~$ cd data
+alice@workstation:~$ ls
+one.txt
+alice@workstation:~$ wc -l one.txt
+2 one.txt
+alice@workstation:~$ find / -name "*.txt"
+/data/one.txt
+/notes.txt
+alice@workstation:~$ who
+alice workstation
 alice@workstation:~$ unknown-command
 shell: unknown command: unknown-command
 alice@workstation:~$ exit 0

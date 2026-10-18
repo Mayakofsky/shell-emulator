@@ -123,11 +123,10 @@ std::vector<std::string> Vfs::splitPath(const std::string& path)
     return components;
 }
 
-const VfsNode* Vfs::resolveCanonical(const std::string& path,
-    std::string& canonical) const
+VfsNode* Vfs::walk(const std::string& path, std::string& canonical)
 {
     std::vector<std::string> resolved;
-    const VfsNode* current = &root_;
+    VfsNode* current = &root_;
     for (const std::string& component : splitPath(path))
     {
         if (component == ".")
@@ -145,7 +144,7 @@ const VfsNode* Vfs::resolveCanonical(const std::string& path,
             current = &root_;
             for (const std::string& step : resolved)
             {
-                const VfsNode* next = current->findChild(step);
+                VfsNode* next = current->findChild(step);
                 if (next == nullptr)
                 {
                     canonical.clear();
@@ -156,7 +155,7 @@ const VfsNode* Vfs::resolveCanonical(const std::string& path,
             continue;
         }
 
-        const VfsNode* next = current->findChild(component);
+        VfsNode* next = current->findChild(component);
         if (next == nullptr)
         {
             canonical.clear();
@@ -174,10 +173,35 @@ const VfsNode* Vfs::resolveCanonical(const std::string& path,
     return current;
 }
 
+const VfsNode* Vfs::resolveCanonical(const std::string& path,
+    std::string& canonical) const
+{
+    return const_cast<Vfs*>(this)->walk(path, canonical);
+}
+
+std::string Vfs::combine(const std::string& base, const std::string& path)
+{
+    if (!path.empty() && path.front() == '/')
+    {
+        return path;
+    }
+    if (base.empty() || base == "/")
+    {
+        return "/" + path;
+    }
+    return base + "/" + path;
+}
+
 const VfsNode* Vfs::resolve(const std::string& path) const
 {
     std::string canonical;
     return resolveCanonical(path, canonical);
+}
+
+const VfsNode* Vfs::resolveFrom(const std::string& base, const std::string& path,
+    std::string& canonical) const
+{
+    return resolveCanonical(combine(base, path), canonical);
 }
 
 void Vfs::collectSubtree(const VfsNode& node, const std::string& prefix,

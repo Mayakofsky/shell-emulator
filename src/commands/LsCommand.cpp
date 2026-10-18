@@ -1,25 +1,50 @@
 #include "LsCommand.hpp"
 
-#include <sstream>
+#include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
 
 std::string_view LsCommand::name() const
 {
     return "ls";
 }
 
-CommandResult LsCommand::execute([[maybe_unused]] CommandContext& context,
+CommandResult LsCommand::execute(CommandContext& context,
     const std::vector<std::string>& arguments) const
 {
-    std::ostringstream output;
-    output << name() << " called with args: [";
-    for (std::size_t index = 0; index < arguments.size(); ++index)
+    if (arguments.size() > 1)
     {
-        if (index > 0)
-        {
-            output << ", ";
-        }
-        output << arguments[index];
+        return CommandResult{{}, "ls: too many arguments", false, 0};
     }
-    output << "]\n";
-    return CommandResult{output.str(), {}, false, 0};
+
+    const std::string path = arguments.empty() ? context.currentDirectory
+        : arguments.front();
+    std::string canonical;
+    const VfsNode* node = context.vfs.resolveFrom(
+        context.currentDirectory, path, canonical);
+    if (node == nullptr)
+    {
+        return CommandResult{{}, "ls: no such path: " + path, false, 0};
+    }
+    if (!node->directory)
+    {
+        return CommandResult{{}, "ls: not a directory: " + path, false, 0};
+    }
+
+    std::vector<std::string> names;
+    names.reserve(node->children.size());
+    for (const std::unique_ptr<VfsNode>& child : node->children)
+    {
+        names.push_back(child->name);
+    }
+    std::sort(names.begin(), names.end());
+
+    std::string output;
+    for (const std::string& entry : names)
+    {
+        output += entry;
+        output.push_back('\n');
+    }
+    return CommandResult{output, {}, false, 0};
 }

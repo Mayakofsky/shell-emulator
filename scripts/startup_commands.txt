@@ -1,0 +1,18 @@
+who
+ls /
+cd /a
+ls
+wc inner.txt
+cd /a/b/c
+ls
+wc deep.txt
+cd /
+find / -name "*.txt"
+find / -type d
+wc /a/inner.txt /a/b/c/deep.txt
+find /missing
+ls /missing
+cd /missing
+wc /missing.txt
+exit 0
+ls after-exit

@@ -17,6 +17,9 @@ add_library(shellcore
     src/commands/CommandRegistry.cpp
     src/commands/LsCommand.cpp
     src/commands/CdCommand.cpp
+    src/commands/WcCommand.cpp
+    src/commands/FindCommand.cpp
+    src/commands/WhoCommand.cpp
     src/commands/ExitCommand.cpp
     src/commands/VfsLoadCommand.cpp
     src/commands/VfsReadCommand.cpp
